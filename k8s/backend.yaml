@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+spec:
+  type: LoadBalancer 
+  selector:
+    app: backend
+  ports:
+    - port: 5000
+      targetPort: 5000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          
+          image: 977099020493.dkr.ecr.ap-south-1.amazonaws.com/todo-backend-repo:latest
+          ports:
+            - containerPort: 5000
+          env:
+            - name: DB_HOST
+              value: "postgres"
+            - name: DB_USER
+              value: "admin"
+            - name: DB_PASSWORD
+              value: "secretpassword"
+            - name: DB_NAME
+              value: "todo_db"
+            - name: REDIS_HOST
+              value: "redis"

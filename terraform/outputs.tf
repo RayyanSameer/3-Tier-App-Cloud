@@ -22,3 +22,11 @@ output "cluster_name" {
     value = module.eks.cluster_name
   
 }
+
+output "ecr_frontend_url" {
+  value = aws_ecr_repository.todo-frontend-repo.repository_url
+}
+
+output "ecr_backend_url" {
+  value = aws_ecr_repository.todo-backend-repo.repository_url
+}

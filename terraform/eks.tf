@@ -4,7 +4,10 @@ module eks{
     source = "terraform-aws-modules/eks/aws"
     version = "19.15.3"
     cluster_name    = "webapp-eks-cluster"
-    cluster_version = "1.27"
+    cluster_version = "1.31"
+
+    cluster_endpoint_public_access  = true
+    cluster_endpoint_private_access = true
 
     # The Network Configuration
     vpc_id     = module.vpc.vpc_id #Get VPC ID from VPC module
