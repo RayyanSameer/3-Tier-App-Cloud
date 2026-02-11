@@ -2,6 +2,9 @@ import boto3
 from services.ebs import scan_ebs
 from services.elastic_ip import scan_eip
 from services.alb import scan_alb
+from services.snapshot import scan_snapshots
+from services.rds import scan_rds
+
 
 
 def main():
@@ -32,7 +35,40 @@ def main():
     orphan_albs = scan_alb(elb_client, cw_client)
     for alb in orphan_albs:
         print(f"[ALB] ID: {alb['ID']} | Name: {alb['Name']} | Cost: ${alb['Cost']:.2f}")
-        total_savings += alb['Cost']     
+        total_savings += alb['Cost']   
+
+    # 4. SNAPSHOT SCAN
+    snapshot_list = []
+    try:
+        response = ec2_client.describe_snapshots(OwnerIds=['self'])
+        for snapshot in response['Snapshots']:
+            if snapshot['State'] == 'completed':
+                snapshot_list.append({
+                    "ID": snapshot['SnapshotId'],
+                    "Size": snapshot['VolumeSize'],
+                    "Cost": 0.0  
+                })
+    except Exception as e:
+        print(f"Error scanning snapshots: {e}")
+
+        for snapshot in snapshot_list:
+            print(f"[SNAPSHOT] ID: {snapshot['ID']} | Size: {snapshot['Size']}GB | Cost: ${snapshot['Cost']:.2f}")
+
+    #5 RDS SCAN
+    rds_client = boto3.client('rds', region_name='ap-south-1')
+    rds_list = scan_rds(rds_client)
+    for rds in rds_list:
+        print(f"[RDS] ID: {rds['ID']} | Engine: {rds['Engine']} | Cost: ${rds['Cost']:.2f}")
+        total_savings += rds['Cost']
+        
+
+
+
+       
+
+    
+
+      
 
     print("-" * 30)
     if total_savings == 0:
