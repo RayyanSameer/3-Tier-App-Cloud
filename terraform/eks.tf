@@ -9,11 +9,11 @@ module eks{
     cluster_endpoint_public_access  = true
     cluster_endpoint_private_access = true
 
-    # The Network Configuration
-    vpc_id     = module.vpc.vpc_id #Get VPC ID from VPC module
-    subnet_ids = module.vpc.private_subnets #Get private subnets from VPC module
+    
+    vpc_id     = module.vpc.vpc_id 
+    subnet_ids = module.vpc.private_subnets 
 
-    #The security system
+
     enable_irsa = true
 
     #The actual worker nodes
