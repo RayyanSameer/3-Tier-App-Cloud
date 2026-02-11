@@ -1,6 +1,8 @@
 import boto3
 from services.ebs import scan_ebs
 from services.elastic_ip import scan_eip
+from services.alb import scan_alb
+
 
 def main():
     ec2_client = boto3.client('ec2', region_name='ap-south-1')
@@ -23,6 +25,9 @@ def main():
         print(f"[EIP] ID: {eip['ID']} | IP: {eip['PublicIP']} | Cost: ${eip['Cost']:.2f}")
         total_savings += eip['Cost']
 
+    # 3. ALB SCAN
+    elb_client = boto3.client('elbv2', region_name='ap-south-1')
+    cw_client = boto3.client('cloudwatch', region_name='ap-south-1')
 
     orphan_albs = scan_alb(elb_client, cw_client)
     for alb in orphan_albs:
@@ -37,7 +42,7 @@ def main():
     print("-" * 30)
 
 
-    #ALB SCAN
+    
 
     
 
