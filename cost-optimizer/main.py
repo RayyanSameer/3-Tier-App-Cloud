@@ -23,12 +23,26 @@ def main():
         print(f"[EIP] ID: {eip['ID']} | IP: {eip['PublicIP']} | Cost: ${eip['Cost']:.2f}")
         total_savings += eip['Cost']
 
+
+    orphan_albs = scan_alb(elb_client, cw_client)
+    for alb in orphan_albs:
+        print(f"[ALB] ID: {alb['ID']} | Name: {alb['Name']} | Cost: ${alb['Cost']:.2f}")
+        total_savings += alb['Cost']     
+
     print("-" * 30)
     if total_savings == 0:
         print(" SUCCESS: Your cloud is clean!")
     else:
         print(f" TOTAL POTENTIAL SAVINGS: ${total_savings:.2f} / month")
     print("-" * 30)
+
+
+    #ALB SCAN
+
+    
+
+    
+        
 
 if __name__ == "__main__":
     main()
