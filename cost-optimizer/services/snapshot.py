@@ -37,12 +37,13 @@ class snapshot_scanner:
                 # An "orphaned" snapshot for cleanup purposes meets two criteria:
                 # 1. It is either completely unassociated with a volume OR
                 # 2. Its associated volume no longer exists AND the snapshot is older than the threshold.
+
                 if is_orphaned_no_volume_id or (is_volume_deleted and is_old):
                     item = {
                         "ID": snapshot_id,
                         "VolumeID": volume_id if volume_id else 'N/A',
                         "VolumeSizeGB": snapshot['VolumeSize'],
-                        # Approximate cost calculation (e.g., $0.05 per GB-month, check current pricing)
+                        
                         "EstimatedMonthlyCost": 0.05 * snapshot['VolumeSize'] 
                     }
                     orphaned_snapshots_list.append(item)
@@ -57,7 +58,7 @@ class snapshot_scanner:
 
 def scan_snapshots():
     # Initialize the EC2 client (boto3 picks up credentials automatically from environment/config)
-    ec2_client = boto3.client('ec2', region_name='us-east-1') # Replace with your desired AWS region
+    ec2_client = boto3.client('ec2', region_name='ap-south-1') 
 
     scanner = snapshot_scanner(ec2_client)
     snapshots = scanner.get_orphaned_snapshots()
@@ -69,7 +70,6 @@ def scan_snapshots():
     else:
         print("No orphaned snapshots found or an error occurred.")
 
-# To run this example:
 if __name__ == "__main__":
     scan_snapshots()
 
