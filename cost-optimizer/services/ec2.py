@@ -25,7 +25,7 @@ class EC2Scanner:
                     item = {
                         "ID": instance_id,
                         "Reason": "Stopped (Paying for Storage)",
-                        "Cost": 2.00 # Approximate EBS cost placeholder
+                        "Cost": 2.00 # Approximate EBS cost 
                     }
                     waste_list.append(item)
                     continue

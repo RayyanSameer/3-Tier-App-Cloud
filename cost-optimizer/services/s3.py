@@ -38,7 +38,7 @@ class S3Scanner:
                 # CHECK 2: Is the bucket "Stale"? 
                 last_modified = objects['Contents'][0]['LastModified']
                 
-                # Calculate age in days
+              
                 days_inactive = (datetime.now(timezone.utc) - last_modified).days
                 
                 if days_inactive > 180:

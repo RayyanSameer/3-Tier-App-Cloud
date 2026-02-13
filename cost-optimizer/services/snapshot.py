@@ -57,7 +57,7 @@ class snapshot_scanner:
 # --- Example Usage ---
 
 def scan_snapshots():
-    # Initialize the EC2 client (boto3 picks up credentials automatically from environment/config)
+  
     ec2_client = boto3.client('ec2', region_name='ap-south-1') 
 
     scanner = snapshot_scanner(ec2_client)
