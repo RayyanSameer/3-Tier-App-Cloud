@@ -5,6 +5,7 @@ from services.alb import scan_alb
 from services.snapshot import scan_snapshots
 from services.rds import scan_rds
 from services.nat import scan_nat
+from services.s3 import scan_s3
 
 
 
@@ -67,6 +68,16 @@ def main():
     for nat in scan_nat(ec2_client, cw_client):
         print(f"[NAT] {nat['ID']} - ${nat['Cost']}")
     total_savings += nat['Cost']
+
+
+    #S3 SCAN
+    print("   Scanning S3 Buckets...")
+    for bucket in scan_s3(s3_client):
+        print(f"[S3]  {bucket['ID']} | {bucket['Reason']} | Potential Save: ${bucket['Cost']}")
+        total_savings += bucket['Cost']
+
+
+    #EC2 SCAN    
 
         
 
