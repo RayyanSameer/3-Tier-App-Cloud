@@ -4,6 +4,7 @@ from services.elastic_ip import scan_eip
 from services.alb import scan_alb
 from services.snapshot import scan_snapshots
 from services.rds import scan_rds
+from services.nat import scan_nat
 
 
 
@@ -60,6 +61,13 @@ def main():
     for rds in rds_list:
         print(f"[RDS] ID: {rds['ID']} | Engine: {rds['Engine']} | Cost: ${rds['Cost']:.2f}")
         total_savings += rds['Cost']
+
+    #NAT GATEWAY 
+
+    for nat in scan_nat(ec2_client, cw_client):
+        print(f"[NAT] {nat['ID']} - ${nat['Cost']}")
+    total_savings += nat['Cost']
+
         
 
 
