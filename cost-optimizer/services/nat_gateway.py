@@ -9,6 +9,7 @@ class nat_scanner:
         self.cw = cw_client
 
     def get_idle_nats(self):
+        print("Scanning for NAT Gateways...")
         response = self.ec2.describe_nat_gateways()
 
         idle = []
@@ -19,6 +20,13 @@ class nat_scanner:
 
             if state != 'available':
                 continue
+
+            name = "N/A"
+            if "Tags" in nat:
+                for tag in nat['Tags']:
+                    if tag['Key'] == 'Name':
+                        name = tag['Value']
+                        break
             
             metric_data = self.cw_client.get_metric_statistics(
                 Namespace='AWS/NATGateway',
@@ -31,6 +39,7 @@ class nat_scanner:
             )
 
             datapoints =metric_data.get("Datapoints", [])
+            total_connections = 0
 
             if not datapoints or datapoints[0].get('Sum',0) == 0:
                 item = {
@@ -45,6 +54,6 @@ class nat_scanner:
             return idle
 
         def scan_nat(ec2_client, cw_client):
-            scanner = NATScanner(ec2_client, cw_client)
+            scanner = nat_scanner(ec2_client, cw_client)
             return scanner.get_idle_nats()
           

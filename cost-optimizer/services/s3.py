@@ -1,60 +1,42 @@
-#Finds empty or old buckets with no lifecycle tier enabled 
-
 import boto3
-from datetime import datetime, timezone
 
 class S3Scanner:
-    def __init__(self, s3_client):
-        self.s3 = s3_client
+    def __init__(self, client):
+        # 1. Store the tool in the robot's belt
+        self.client = client
 
-    def get_s3_waste(self):
-        # 1. Get the list of all buckets
-        try:
-            response = self.s3.list_buckets()
-            buckets = response.get('Buckets', [])
-        except Exception as e:
-            print(f"Error listing buckets: {e}")
-            return []
+    def scan_regions(self):
+        # 2. Use the stored tool
+        response = self.client.list_buckets()
+        
+        print(f"Found {len(response['Buckets'])} buckets. Checking regions...")
 
-        waste_list = []
-
-        for bucket in buckets:
+        for bucket in response['Buckets']:
             name = bucket['Name']
             
+            loc_response = self.client.get_bucket_location(Bucket=name)
+            region = loc_response['LocationConstraint']
             try:
-                
-                objects = self.s3.list_objects_v2(Bucket=name, MaxKeys=1)
-                
-                # CHECK 1: Is the bucket completely empty?
-                if objects['KeyCount'] == 0:
-                    item = {
-                        "ID": name,
-                        "Reason": "Empty Bucket (Clutter)",
-                        "Cost": 0.00 
-                    }
-                    waste_list.append(item)
-                    continue
+                public_access_status = self.client.get_public_access_block(Bucket = name)
+            except ClientError as e:
+                if e.response['Erreor']["Code"]  == 'NoSuchPublicAccessBlockConfiguration':
+                    print(f" DANGER: {name} has NO Public Access Block! (Public?)")
+                else:
+                    print(f" Error checking {name}: {e}") 
 
-                # CHECK 2: Is the bucket "Stale"? 
-                last_modified = objects['Contents'][0]['LastModified']
-                
-              
-                days_inactive = (datetime.now(timezone.utc) - last_modified).days
-                
-                if days_inactive > 180:
-                    item = {
-                        "ID": name,
-                        "Reason": f"Stale Data ({days_inactive} days old)",
-                        "Cost": 2.50 
-                    }
-                    waste_list.append(item)
+            else:
+                print("SECURE")        
 
-            except Exception as e:
-               
-                continue
 
-        return waste_list
 
-def scan_s3(s3_client):
-    scanner = S3Scanner(s3_client)
-    return scanner.get_s3_waste()
+            # The "us-east-1" Fix
+            if region is None:
+                region = "us-east-1"
+
+            print(f"   > Bucket: {name} | Region: {region}")
+
+# --- Execution ---
+if __name__ == "__main__":
+    s3 = boto3.client('s3')
+    scanner = S3Scanner(s3)
+    scanner.scan_regions()
