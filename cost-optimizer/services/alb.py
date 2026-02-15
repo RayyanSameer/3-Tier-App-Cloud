@@ -1,6 +1,7 @@
 import boto3
 from datetime import datetime, timedelta
 
+
 class ALBScanner():
     def __init__(self, elb_client, cw_client):
         self.client = elb_client

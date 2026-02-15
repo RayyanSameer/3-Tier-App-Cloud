@@ -1,43 +1,41 @@
-import boto3
-from dashboard import generate_dashboard
+from tabulate import tabulate
+from colorama import Fore, Style, init
 
-# Import your scanners
-from services.ebs import scan_ebs
-from services.elastic_ip import scan_eip
-from services.alb import scan_alb
-from services.nat import scan_nat
-from services.snapshots import scan_snapshots
-from services.rds import scan_rds
-from services.s3 import scan_s3
-from services.ec2 import scan_ec2
+init()
 
-def main():
-    region = 'ap-south-1'
+def generate_dashboard(cloud_data):
+    print(Style.BRIGHT + Fore.CYAN + "\n" + "="*60)
+    print("     AWS COST OPTIMIZER REPORT   ")
+    print("="*60 + Style.RESET_ALL)
     
-    # 1. Initialize Clients 
-    ec2 = boto3.client('ec2', region_name=region)
-    elb = boto3.client('elbv2', region_name=region)
-    cw = boto3.client('cloudwatch', region_name=region)
-    rds = boto3.client('rds', region_name=region)
-    s3 = boto3.client('s3', region_name=region)
+    grand_total = 0.0
+    summary_data = []
+    all_details = []
 
-    print(f"\n🚀 Connecting to AWS ({region})... scanning resources...")
+    for service, resources in cloud_data.items():
+        service_total = 0.0
+        count = len(resources)
+        
+        for item in resources:
+            cost = item.get('Cost', 0.0)
+            service_total += cost
+            grand_total += cost
+            all_details.append([service, item.get('ID', 'N/A'), item.get('Reason', 'Unused'), f"${cost:.2f}"])
+            
+        if count > 0:
+            summary_data.append([service, count, f"${service_total:.2f}"])
 
-    # 2. Run Scanners & Aggregate Data
-  
-    cloud_data = {
-        'EBS Volumes': scan_ebs(ec2),
-        'Elastic IPs': scan_eip(ec2),
-        'Load Balancers': scan_alb(elb, cw),
-        'NAT Gateways': scan_nat(ec2, cw),
-        'Snapshots': scan_snapshots(ec2),
-        'RDS Instances': scan_rds(rds),
-        'S3 Buckets': scan_s3(s3),
-        'EC2 Instances': scan_ec2(ec2, cw)
-    }
+    print(Fore.YELLOW + "\n EXECUTIVE SUMMARY" + Style.RESET_ALL)
+    if summary_data:
+        print(tabulate(summary_data, headers=["Service", "Count", "Monthly Waste"], tablefmt="fancy_grid"))
+    else:
+        print(Fore.GREEN + "  No waste found." + Style.RESET_ALL)
 
-    # 3. Generate the Report
-    generate_dashboard(cloud_data)
+    if all_details:
+        print(Fore.YELLOW + "\n DETAILED FINDINGS" + Style.RESET_ALL)
+        all_details.sort(key=lambda x: float(x[3].replace('$', '')), reverse=True)
+        print(tabulate(all_details, headers=["Service", "Resource ID", "Reason", "Est. Cost"], tablefmt="simple"))
 
-if __name__ == "__main__":
-    main()
+    print(Style.BRIGHT + "\n" + "-"*60)
+    print(f" TOTAL POTENTIAL SAVINGS: ${grand_total:.2f} / month")
+    print("-"*60 + "\n")

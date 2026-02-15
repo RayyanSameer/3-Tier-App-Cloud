@@ -1,6 +1,6 @@
 import boto3
-import datetime 
 from datetime import datetime, timedelta
+from services.pricing import get_ec2_price
 
 class EC2Scanner:
     def __init__(self, ec2_client, cw_client):
@@ -8,54 +8,53 @@ class EC2Scanner:
         self.cw = cw_client
 
     def get_ec2_waste(self):
-        # 1. Get all instances
         response = self.ec2.describe_instances()
         waste_list = []
 
-        
         for reservation in response['Reservations']:
             for instance in reservation['Instances']:
                 
                 instance_id = instance['InstanceId']
                 state = instance['State']['Name']
-                instance_type = instance['InstanceType']
+                inst_type = instance['InstanceType']
                 
-                # CASE 1: The "Stopped" Instance
+                # CASE 1: Stopped Instance (Paying for EBS only usually, but let's flag it)
                 if state == 'stopped':
                     item = {
                         "ID": instance_id,
-                        "Reason": "Stopped (Paying for Storage)",
-                        "Cost": 2.00 # Approximate EBS cost 
+                        "Reason": "Stopped Instance",
+                        "Cost": 2.00 # Nominal EBS cost estimate
                     }
                     waste_list.append(item)
                     continue
 
-                # CASE 2: The "Zombie" (Running but Idle)
+                # CASE 2: Zombie Instance (Running but Idle)
                 if state == 'running':
-                    
-                    metric = self.cw.get_metric_statistics(
-                        Namespace='AWS/EC2',
-                        MetricName='CPUUtilization',
-                        Dimensions=[{'Name': 'InstanceId', 'Value': instance_id}],
-                        StartTime=datetime.utcnow() - timedelta(days=7), # Check last 7 days
-                        EndTime=datetime.utcnow(),
-                        Period=86400,
-                        Statistics=['Average']
-                    )
-                    
-                    # Check the data
-                    datapoints = metric.get('Datapoints', [])
-                    if datapoints:
+                    try:
+                        metric = self.cw.get_metric_statistics(
+                            Namespace='AWS/EC2',
+                            MetricName='CPUUtilization',
+                            Dimensions=[{'Name': 'InstanceId', 'Value': instance_id}],
+                            StartTime=datetime.utcnow() - timedelta(days=7),
+                            EndTime=datetime.utcnow(),
+                            Period=86400,
+                            Statistics=['Average']
+                        )
                         
-                        avg_cpu = datapoints[0]['Average']
-                        
-                        if avg_cpu < 1.0: 
-                            item = {
-                                "ID": instance_id,
-                                "Reason": f"Low CPU ({avg_cpu:.2f}%) - Zombie",
-                                "Cost": 20.00 # 
-                            }
-                            waste_list.append(item)
+                        datapoints = metric.get('Datapoints', [])
+                        if datapoints:
+                            avg_cpu = datapoints[0]['Average']
+                            if avg_cpu < 1.0:
+                                real_cost = get_ec2_price(inst_type)
+                                item = {
+                                    "ID": instance_id,
+                                    "Reason": f"Zombie {inst_type} (CPU {avg_cpu:.1f}%)",
+                                    "Cost": real_cost
+                                }
+                                waste_list.append(item)
+                    except Exception as e:
+                        print(f"Error checking EC2 {instance_id}: {e}")
+                        continue
         
         return waste_list
 

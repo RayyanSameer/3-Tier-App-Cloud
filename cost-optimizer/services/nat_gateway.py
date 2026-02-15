@@ -1,36 +1,22 @@
 import boto3
-from datetime import datetime, timedelta 
+from datetime import datetime, timedelta
+from services.pricing import PRICING
 
-class nat_scanner:
+class NATScanner:
     def __init__(self, ec2_client, cw_client):
         self.ec2 = ec2_client
-        self.cw = cw_client 
+        self.cw = cw_client
 
     def get_idle_nats(self):
-        print("Scanning for NAT Gateways...")
         response = self.ec2.describe_nat_gateways()
+        idle_list = []
 
-        idle = []
-
-        # Use .get() to be safe
         for nat in response.get('NatGateways', []):
             nat_id = nat['NatGatewayId']
-            state = nat['State']
-
-            if state != 'available':
+            if nat['State'] != 'available':
                 continue
-
-            # --- Logic to find Name Tag ---
-            name = "N/A"
-            if "Tags" in nat:
-                for tag in nat['Tags']:
-                    if tag['Key'] == 'Name':
-                        name = tag['Value']
-                        break
             
-            # --- CloudWatch Check ---
             try:
-      
                 metric_data = self.cw.get_metric_statistics(
                     Namespace='AWS/NATGateway',
                     MetricName='ConnectionEstablishedCount',
@@ -43,22 +29,18 @@ class nat_scanner:
 
                 datapoints = metric_data.get("Datapoints", [])
 
-                # Logic: If no data points OR sum is 0
                 if not datapoints or datapoints[0].get('Sum', 0) == 0:
                     item = {
                         "ID": nat_id,
-                        "Name": name, 
-                        "Cost": 32.40,
-                        "Reason": "Idle (0 Connections)"
+                        "Reason": "Idle NAT Gateway",
+                        "Cost": PRICING['nat_gateway']
                     }
-                    idle.append(item)
-            
+                    idle_list.append(item)
             except Exception as e:
-                print(f"Error checking NAT {nat_id}: {e}")
                 continue
-
-        return idle 
+        
+        return idle_list
 
 def scan_nat(ec2_client, cw_client): 
-    scanner = nat_scanner(ec2_client, cw_client)
+    scanner = NATScanner(ec2_client, cw_client)
     return scanner.get_idle_nats()

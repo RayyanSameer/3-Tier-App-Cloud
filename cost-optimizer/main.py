@@ -1,10 +1,7 @@
-print("DEBUG: Script is starting...") 
-
 import boto3
 from dashboard import generate_dashboard
 
 
-# --- IMPORT ALL SCANNERS ---
 from services.ebs import scan_ebs
 from services.elastic_ip import scan_eip
 from services.alb import scan_alb
@@ -20,14 +17,15 @@ def main():
     print(f"\n Connecting to AWS ({region})... This may take a moment...")
 
     try:
-        # 1. INITIALIZE CLIENTS
+     
+        
         ec2 = boto3.client('ec2', region_name=region)
         elb = boto3.client('elbv2', region_name=region)
         cw = boto3.client('cloudwatch', region_name=region)
         rds = boto3.client('rds', region_name=region)
         s3 = boto3.client('s3', region_name=region)
 
-        # 2. GATHER DATA
+    
         print("   ... Scanning EBS Volumes")
         ebs_data = scan_ebs(ec2)
         
@@ -52,6 +50,7 @@ def main():
         print("   ... Scanning EC2 (This is the slow one)")
         ec2_data = scan_ec2(ec2, cw)
 
+      
         cloud_data = {
             'EBS Volumes': ebs_data,
             'Elastic IPs': eip_data,
@@ -63,12 +62,13 @@ def main():
             'EC2 Instances': ec2_data
         }
 
-        # 3. SHOW THE REPORT
+    
         generate_dashboard(cloud_data)
 
     except Exception as e:
         print(f"\n CRITICAL ERROR IN MAIN: {e}")
-
+        import traceback
+        traceback.print_exc()
 
 if __name__ == "__main__":
     main()
