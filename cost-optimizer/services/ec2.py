@@ -1,6 +1,6 @@
 import boto3
 import datetime 
-import datetime, timedelta
+from datetime import datetime, timedelta
 
 class EC2Scanner:
     def __init__(self, ec2_client, cw_client):
