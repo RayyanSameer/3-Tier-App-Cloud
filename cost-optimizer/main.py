@@ -1,7 +1,7 @@
 import boto3
 from dashboard import generate_dashboard
 
-
+from services.vpc import scan_vpc
 from services.ebs import scan_ebs
 from services.elastic_ip import scan_eip
 from services.alb import scan_alb
@@ -56,6 +56,9 @@ def main():
         print("   ... Scanning EKS Clusters") 
         eks_data = scan_eks(eks)
 
+        print("   ... Scanning VPCs & Public IPs")
+        vpc_data = scan_vpc(ec2)
+
       
         cloud_data = {
             'EBS Volumes': ebs_data,
@@ -66,7 +69,8 @@ def main():
             'RDS Instances': rds_data,
             'S3 Buckets': s3_data,
             'EC2 Instances': ec2_data,
-            'EKS Clusters' :eks_data
+            'EKS Clusters' :eks_data,
+            'VPC & Public IPs': vpc_data
         }
 
     

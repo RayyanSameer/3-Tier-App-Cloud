@@ -1,25 +1,33 @@
 import boto3
-class eks_scanner:
-    def __init__(self ,eks_client):
+
+class EKSScanner:
+    def __init__(self, eks_client):
         self.eks = eks_client
 
     def get_clusters(self):
-        try:
-            clusters = self.eks.list_clusters()[clusters]
-            waste_clusters = []
-
-            for cluster in clusters:
-                waste_clusters.append({
-                    "ID": cluster,
-                    "Reason": "Control Plane is bill able",
-                    "Cost" : 72.00 #Monthly flat
-                })    
-
-            return waste_clusters
-        except Exception as e:
-            print(f"An error has occured scanning EKS: {e}")    
-            return[]
+        waste = []
         
+        try:
+            
+            response = self.eks.list_clusters()
+            
+            
+            clusters = response.get('clusters', [])
+            
+           
+            for cluster in clusters:
+                waste.append({
+                    "ID": cluster,
+                    "Reason": "EKS Control Plane (Active)",
+                    "Cost": 72.00  # $0.10/hr * 720 hours
+                })
+                
+        except Exception as e:
+            print(f"  Error scanning EKS: {e}")
+            return []
+
+        return waste
+
 def scan_eks(eks_client):
-    scanner = eks_scanner(eks_client)
-    return scanner.get_clusters()        
+    scanner = EKSScanner(eks_client)
+    return scanner.get_clusters()
