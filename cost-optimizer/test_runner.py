@@ -25,9 +25,9 @@ def test_my_tool():
     ec2.delete_volume(VolumeId=vol) # Delete volume 
 
     print("   ... Creating an idle EKS Cluster ($72/mo waste)")
-    eks.create_cluster(name='Unused-Cluster', roleArn='arn:aws:iam::123:role/role', resourcesVpcConfig={})
+    eks.create_cluster(name='Unused-Cluster', roleArn='arn:aws:iam::123456789012:role/TestingRole', resourcesVpcConfig={})
 
-    # 3. RUN YOUR SCANNERS
+    # 3. RUN  SCANNERS
     print("\n RUNNING YOUR TOOL...")
     nat_waste = scan_nat(ec2, cw)
     snap_waste = scan_snapshots(ec2)

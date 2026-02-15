@@ -25,7 +25,7 @@ def generate_dashboard(cloud_data):
         if count > 0:
             summary_data.append([service, count, f"${service_total:.2f}"])
 
-    print(Fore.YELLOW + "\n EXECUTIVE SUMMARY" + Style.RESET_ALL)
+    print(Fore.YELLOW + "\n  SUMMARY" + Style.RESET_ALL)
     if summary_data:
         print(tabulate(summary_data, headers=["Service", "Count", "Monthly Waste"], tablefmt="fancy_grid"))
     else:
