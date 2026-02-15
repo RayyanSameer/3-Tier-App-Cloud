@@ -10,6 +10,7 @@ from services.rds import scan_rds
 from services.nat_gateway import scan_nat
 from services.s3 import scan_s3
 from services.ec2 import scan_ec2
+from services.eks import scan_eks
 
 def main():
     region = 'ap-south-1'
@@ -24,6 +25,8 @@ def main():
         cw = boto3.client('cloudwatch', region_name=region)
         rds = boto3.client('rds', region_name=region)
         s3 = boto3.client('s3', region_name=region)
+        s3 = boto3.client('s3', region_name=region)
+        eks = boto3.client('eks', region_name=region)
 
     
         print("   ... Scanning EBS Volumes")
@@ -47,8 +50,11 @@ def main():
         print("   ... Scanning S3")
         s3_data = scan_s3(s3)
         
-        print("   ... Scanning EC2 (This is the slow one)")
+        print("   ... Scanning EC2 ")
         ec2_data = scan_ec2(ec2, cw)
+
+        print("   ... Scanning EKS Clusters") 
+        eks_data = scan_eks(eks)
 
       
         cloud_data = {
@@ -59,7 +65,8 @@ def main():
             'Snapshots': snap_data,
             'RDS Instances': rds_data,
             'S3 Buckets': s3_data,
-            'EC2 Instances': ec2_data
+            'EC2 Instances': ec2_data,
+            'EKS Clusters' :eks_data
         }
 
     
