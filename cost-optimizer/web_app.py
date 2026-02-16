@@ -1,7 +1,8 @@
 import streamlit as st
 import pandas as pd
 import boto3
-import time 
+import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 # --- IMPORT SCANNERS ---
 from services.ebs import scan_ebs
@@ -18,143 +19,156 @@ from services.vpc import scan_vpc
 try:
     from services.alb import scan_alb
 except ImportError:
-    scan_alb = None  
-    print("ALB scanner not found.")
+    scan_alb = None
 
 # --- PAGE CONFIG ---
-st.set_page_config(page_title="AWS Cost Optimizer", layout="wide")
+st.set_page_config(page_title="AWS Cost Optimizer", layout="wide", page_icon="⚡")
 
-st.title("💸 AWS Cost Optimizer")
+st.title("⚡ AWS Cost Optimizer (Fast Mode)")
 st.markdown("""
-**Stop wasting money on unused AWS resources!** This tool scans your AWS account for idle and underutilized resources, providing actionable insights to help you save costs.
+**Stop wasting money.** This tool scans your AWS account in parallel to find idle resources instantly.
 """)
 
 # --- SIDEBAR ---
 with st.sidebar:
-    st.header(" Scan Options")
+    st.header(" Configuration")
     region = st.text_input("AWS Region", value="ap-south-1")
-
-    # Use a button to trigger the state
-    if st.button(" Start Scan"):
+    
+    if st.button(" Run Fast Scan"):
         st.session_state['scan_in_progress'] = True
     
-    # Optional: Add a Reset button
-    if st.button("Reset"):
+    # Reset button
+    if st.button(" Reset"):
         st.session_state['scan_in_progress'] = False
+        st.rerun()
 
-# --- MAIN CONTENT ---
-
+# --- MAIN LOGIC ---
 if st.session_state.get('scan_in_progress', False):
     
-    with st.spinner(f"Connecting to AWS ({region})..."):
+    # 1. INITIALIZE CLIENTS (Fast)
+    with st.spinner(f"🔌 Connecting to AWS ({region})..."):
         try:
-            # Initialize Clients
-            ec2 = boto3.client('ec2', region_name=region)
-            elb = boto3.client('elbv2', region_name=region)
-            cw = boto3.client('cloudwatch', region_name=region)
-            rds = boto3.client('rds', region_name=region)
-            s3 = boto3.client('s3', region_name=region)
-            eks = boto3.client('eks', region_name=region)
-
-            # Helper function to run scans
-            progress_bar = st.progress(0)
-            status = st.empty()
-
-            def run_scan(name, func, args, progress):
-                status.text(f"Scanning {name}...")
-                data = func(*args) # Unpack arguments
-                progress_bar.progress(progress)
-                return data
-
-            
-            scans = [
-                ("EBS Volumes", scan_ebs, [ec2]),
-                ("Elastic IPs", scan_eip, [ec2]),
-                ("Snapshots", scan_snapshots, [ec2]),
-                ("RDS Instances", scan_rds, [rds, cw]),
-                ("NAT Gateways", scan_nat, [ec2, cw]),
-                ("S3 Buckets", scan_s3, [s3]),
-                ("EC2 Instances", scan_ec2, [ec2, cw]),
-                ("EKS Clusters", scan_eks, [eks]),
-                ("VPCs", scan_vpc, [ec2])
-            ]
-
-            # Fix: Insert correctly as a single Tuple
-            if scan_alb:
-                scans.insert(2, ("Load Balancers", scan_alb, [elb, cw]))
-
-            results = {}
-            total_savings = 0.0
-
-            step = 100 // len(scans)
-            current_progress = 0
-
-            # --- EXECUTION LOOP ---
-            for name, func, args in scans:
-             
-                data = run_scan(name, func, args, current_progress)
-                results[name] = data
-                
-              
-                for item in data:
-                    total_savings += float(item.get("Cost", 0.0))
-                
-                current_progress += step
-                if current_progress > 100: current_progress = 100
-
-            # Finalize
-            progress_bar.progress(100)
-            status.success(" Scan Complete!")
-            time.sleep(1)
-            progress_bar.empty()
-
-            # --- DISPLAY RESULTS ---
-            st.divider()
-            col1, col2, col3 = st.columns(3)
-            with col1:
-                st.metric(label="Total Potential Savings", value=f"${total_savings:.2f}", delta="Monthly Waste")
-            with col2:
-                st.metric(label="Services Scanned", value=len(scans))
-            with col3:
-                waste_count = sum(len(v) for v in results.values())
-                st.metric(label="Resources Flagged", value=waste_count)
-
-            st.subheader("🕵️ Detailed Findings")
-            
-            # Prepare Data for Table & Chart
-            all_rows = []
-            chart_data = []
-
-            for service, items in results.items():
-                service_total = 0.0
-                for item in items:
-                    cost = float(item.get('Cost', 0.0))
-                    service_total += cost
-                    all_rows.append({
-                        "Service": service,
-                        "Resource ID": item.get('ID'),
-                        "Reason": item.get('Reason'),
-                        "Cost ($)": f"${cost:.2f}"
-                    })
-                
-                if service_total > 0:
-                    chart_data.append({"Service": service, "Cost": service_total})
-
-            # Display Table
-            if all_rows:
-                df = pd.DataFrame(all_rows)
-                st.dataframe(df, use_container_width=True)
-
-                # Display Chart
-                st.subheader(" Cost Breakdown")
-                if chart_data:
-                    chart_df = pd.DataFrame(chart_data)
-                    st.bar_chart(chart_df, x="Service", y="Cost")
-            else:
-                st.success(" No waste found! Your account is optimized.")
-
+            session = boto3.Session(region_name=region)
+            ec2 = session.client('ec2')
+            elb = session.client('elbv2')
+            cw = session.client('cloudwatch')
+            rds = session.client('rds')
+            s3 = session.client('s3')
+            eks = session.client('eks')
         except Exception as e:
-            st.error(f"An error occurred: {e}")
+            st.error(f"AWS Connection Error: {e}")
+            st.stop()
 
+    # 2. DEFINE SCANS
+    scans = [
+        ("EBS Volumes", scan_ebs, [ec2]),
+        ("Elastic IPs", scan_eip, [ec2]),
+        ("Snapshots", scan_snapshots, [ec2]),
+        ("RDS Instances", scan_rds, [rds, cw]),
+        ("NAT Gateways", scan_nat, [ec2, cw]),
+        ("S3 Buckets", scan_s3, [s3]),
+        ("EC2 Instances", scan_ec2, [ec2, cw]),
+        ("EKS Clusters", scan_eks, [eks]),
+        ("VPCs", scan_vpc, [ec2])
+    ]
 
+    if scan_alb:
+        scans.insert(2, ("Load Balancers", scan_alb, [elb, cw]))
 
+    # 3. RUN PARALLEL SCANS
+    results = {}
+    total_savings = 0.0
+    
+    # UI Elements for Progress
+    progress_bar = st.progress(0)
+    status_text = st.empty()
+    
+    # The ThreadPool Engine
+    with st.spinner(" Scanning all services simultaneously..."):
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            # Submit all tasks to the pool
+            future_to_name = {
+                executor.submit(func, *args): name 
+                for name, func, args in scans
+            }
+            
+            completed_count = 0
+            total_scans = len(scans)
+            
+            # Process as they finish (First Come, First Served)
+            for future in as_completed(future_to_name):
+                name = future_to_name[future]
+                try:
+                    data = future.result()
+                    results[name] = data
+                    
+                    # Calculate savings immediately
+                    for item in data:
+                        total_savings += float(item.get("Cost", 0.0))
+                        
+                except Exception as e:
+                    results[name] = []
+                    st.toast(f"⚠️ Error scanning {name}: {e}")
+                
+                # Update Progress
+                completed_count += 1
+                progress = int((completed_count / total_scans) * 100)
+                progress_bar.progress(progress)
+                status_text.text(f" Finished: {name}")
+
+    time.sleep(0.5)
+    progress_bar.empty()
+    status_text.empty()
+
+    # 4. DASHBOARD UI
+    st.divider()
+    
+    # Top Metrics
+    c1, c2, c3 = st.columns(3)
+    c1.metric("Total Monthly Waste", f"${total_savings:.2f}", delta="Potential Savings")
+    c2.metric("Services Scanned", len(scans))
+    c3.metric("Resources Flagged", sum(len(v) for v in results.values()))
+
+    # Detailed Table
+    st.subheader(" Detailed Findings")
+    
+    all_rows = []
+    chart_data = []
+
+    for service, items in results.items():
+        service_total = 0.0
+        for item in items:
+            cost = float(item.get('Cost', 0.0))
+            service_total += cost
+            all_rows.append({
+                "Service": service,
+                "Resource ID": item.get('ID'),
+                "Reason": item.get('Reason'),
+                "Cost": cost  # Keep as number for sorting
+            })
+        
+        if service_total > 0:
+            chart_data.append({"Service": service, "Cost": service_total})
+
+    if all_rows:
+        df = pd.DataFrame(all_rows)
+        # Format Cost column for display
+        df['Cost ($)'] = df['Cost'].apply(lambda x: f"${x:.2f}")
+        
+        # Sort by most expensive
+        df = df.sort_values(by="Cost", ascending=False)
+        
+        st.dataframe(
+            df[["Service", "Resource ID", "Reason", "Cost ($)"]], 
+            use_container_width=True,
+            hide_index=True
+        )
+
+        # Bar Chart
+        st.subheader(" Waste by Service")
+        if chart_data:
+            chart_df = pd.DataFrame(chart_data).set_index("Service")
+            st.bar_chart(chart_df)
+    else:
+        st.balloons()
+        st.success(" Your AWS account is squeaky clean! No waste found.")
